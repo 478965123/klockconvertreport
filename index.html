@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Report Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<style>
+:root {
+  --primary: #1a5276;
+  --accent: #2980b9;
+  --success: #1e8449;
+  --danger: #c0392b;
+  --warn: #b7770d;
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --text: #2c3e50;
+  --muted: #7f8c8d;
+  --border: #dde3ea;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+header {
+  background: linear-gradient(135deg, #1a5276 0%, #2471a3 100%);
+  color: white; padding: 18px 28px;
+  display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+header .icon { font-size: 2rem; }
+header h1 { font-size: 1.2rem; font-weight: 700; }
+header p { font-size: 0.8rem; opacity: 0.8; margin-top: 2px; }
+
+/* CONTAINER */
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+/* CARD */
+.card {
+  background: var(--card); border-radius: 12px;
+  padding: 22px; margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+}
+.card-title {
+  font-size: 0.95rem; font-weight: 700;
+  color: var(--primary); margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* UPLOAD GRID */
+.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 640px) { .upload-grid { grid-template-columns: 1fr; } }
+
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 22px 14px; text-align: center;
+  cursor: pointer; transition: all 0.2s; position: relative;
+  background: #fafbfc;
+}
+.upload-zone:hover { border-color: var(--accent); background: #eaf4fb; }
+.upload-zone.filled { border-color: var(--success); background: #eafaf1; }
+.upload-zone.drag-over { border-color: var(--accent); background: #d6eaf8; }
+.upload-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0;
+  cursor: pointer; width: 100%; height: 100%;
+}
+.zone-icon { font-size: 2rem; margin-bottom: 8px; }
+.zone-label { font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 3px; }
+.zone-hint { font-size: 0.72rem; color: var(--muted); }
+.zone-file { font-size: 0.75rem; color: var(--success); font-weight: 600; margin-top: 6px; word-break: break-all; }
+
+/* BUTTON */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px; border-radius: 8px; border: none;
+  cursor: pointer; font-size: 0.88rem; font-weight: 700;
+  transition: all 0.2s; font-family: inherit;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover:not(:disabled) { background: #154360; }
+.btn-primary:disabled { background: #aab4bc; cursor: not-allowed; }
+.btn-success { background: var(--success); color: white; }
+.btn-success:hover { background: #145a32; }
+.btn-sm { padding: 7px 14px; font-size: 0.78rem; }
+
+/* TABS */
+.tab-bar { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.tab-btn {
+  padding: 9px 22px; border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0; background: transparent;
+  cursor: pointer; font-size: 0.85rem; font-weight: 600;
+  color: var(--muted); transition: all 0.2s; font-family: inherit;
+  margin-bottom: -2px;
+}
+.tab-btn.active {
+  background: white; color: var(--primary);
+  border-color: var(--border) var(--border) white;
+}
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* SUMMARY BAR */
+.summary-bar {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  padding: 12px 16px; background: #f8fafc;
+  border-radius: 8px; margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+.summary-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; }
+.badge {
+  display: inline-block; padding: 2px 10px;
+  border-radius: 100px; font-size: 0.75rem; font-weight: 700;
+}
+.badge-blue { background: #d6eaf8; color: #1a5276; }
+.badge-green { background: #d5f5e3; color: #1e8449; }
+.badge-red { background: #fde8e8; color: #c0392b; }
+.badge-gray { background: #eaecee; color: #566573; }
+.badge-orange { background: #fef9e7; color: #b7770d; }
+
+/* TABLE */
+.table-wrap {
+  overflow: auto; max-height: 460px;
+  border: 1px solid var(--border); border-radius: 8px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.76rem; }
+thead th {
+  background: var(--primary); color: white;
+  padding: 9px 10px; text-align: left;
+  position: sticky; top: 0; z-index: 1;
+  white-space: nowrap; font-weight: 600;
+}
+thead th.highlight-col { background: #c0392b; }
+tbody td { padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:nth-child(even) td { background: #f8fafc; }
+tbody tr:hover td { background: #eaf4fb; }
+.cell-late-mins { color: #c0392b; font-weight: 700; background: #fdf0ef !important; }
+.cell-late { color: #c0392b; font-weight: 700; }
+.cell-present { color: #1e8449; font-weight: 600; }
+.cell-absent { color: #7f8c8d; }
+
+/* MSG */
+.msg { padding: 10px 14px; border-radius: 8px; font-size: 0.83rem; margin-bottom: 12px; }
+.msg-info { background: #ebf5fb; color: #1a5276; border: 1px solid #a9cce3; }
+.msg-warn { background: #fef9e7; color: #7d6608; border: 1px solid #f8c471; }
+
+/* ACTIONS */
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.actions-note { font-size: 0.76rem; color: var(--muted); }
+
+/* SHEET SELECTOR */
+.sheet-select-wrap { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 0.83rem; }
+.sheet-select-wrap select { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: inherit; font-size: 0.83rem; }
+
+.hidden { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin 0.8s linear infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="icon">🏥</div>
+  <div>
+    <h1>Hospital Report Converter</h1>
+    <p>แปลง Daily & Monthly Report พร้อมคำนวณ Late Mins อัตโนมัติจากข้อมูลกะ</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-title">📁 อัปโหลดไฟล์ Input (ครบ 3 ไฟล์จึงจะแปลงได้)</div>
+    <div class="upload-grid">
+
+      <div class="upload-zone" id="zone-daily"
+           ondragover="onDragOver(event,'daily')" ondragleave="onDragLeave('daily')" ondrop="onDrop(event,'daily')">
+        <input type="file" id="file-daily" accept=".xls,.xlsx" onchange="handleFile('daily',this)">
+        <div class="zone-icon">📊</div>
+        <div class="zone-label">Daily Report</div>
+        <div class="zone-hint">report-29_05_2569.xls</div>
+        <div class="zone-file" id="fname-daily"></div>
+      </div>
+
+      <div class="upload-zone" id="zone-monthly"
+           ondragover="onDragOver(event,'monthly')" ondragleave="onDragLeave('monthly')" ondrop="onDrop(event,'monthly')">
+        <input type="file" id="file-monthly" accept=".xls,.xlsx" onchange="handleFile('monthly',this)">
+        <div class="zone-icon">📅</div>
+        <div class="zone-label">Monthly Report</div>
+        <div class="zone-hint">report-2026-05.xls</div>
+        <div class="zone-file" id="fname-monthly"></div>
+      </div>
+
+      <div class="upload-zone" id="zone-shift"
+           ondragover="onDragOver(event,'shift')" ondragleave="onDragLeave('shift')" ondrop="onDrop(event,'shift')">
+        <input type="file" id="file-shift" accept=".xls,.xlsx" onchange="handleFile('shift',this)">
+        <div class="zone-icon">🔄</div>
+        <div class="zone-label">ข้อมูลกะ (Shift)</div>
+        <div class="zone-hint">group-workday-and-name-unique.xlsx</div>
+        <div class="zone-file" id="fname-shift"></div>
+      </div>
+
+    </div>
+    <div style="margin-top:18px; display:flex; align-items:center; gap:12px;">
+      <button class="btn btn-primary" id="btn-convert" onclick="convertAll()" disabled>
+        ⚙️ แปลงไฟล์
+      </button>
+      <span id="convert-status" style="font-size:0.82rem; color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result-section" class="hidden">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('daily')">📊 Daily Report</button>
+      <button class="tab-btn" onclick="switchTab('monthly')">📅 Monthly Report</button>
+    </div>
+
+    <!-- DAILY -->
+    <div class="tab-pane active" id="pane-daily">
+      <div class="card">
+        <div class="card-title">📊 ผลลัพธ์ Daily Report <span style="font-weight:400; color:var(--muted); font-size:0.8rem;">(เพิ่มคอลัมน์ Late Mins)</span></div>
+        <div id="daily-summary" class="summary-bar"></div>
+        <div id="daily-warn" class="hidden"></div>
+        <div class="table-wrap"><table id="daily-table"></table></div>
+        <div class="actions">
+          <button class="btn btn-success" onclick="downloadDaily()">⬇️ ดาวน์โหลด Result_daily_report.xlsx</button>
+          <span class="actions-note">* Late Mins เก็บเป็น fraction ของวัน (เหมือนต้นฉบับ) | แสดงในตารางเป็นนาที</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY -->
+    <div class="tab-pane" id="pane-monthly">
+      <div class="card">
+        <div class="card-title">📅 ผลลัพธ์ Monthly Report <span style="font-weight:400; color:var(--muted); font-size:0.8rem;">(สลับ Location Out ↔ Time In)</span></div>
+        <div id="monthly-info" class="msg msg-info hidden"></div>
+        <div class="sheet-select-wrap">
+          <label>เลือก Sheet (พนักงาน):</label>
+          <select id="sheet-select" onchange="renderMonthlySheet(this.value)"></select>
+        </div>
+        <div class="table-wrap"><table id="monthly-table"></table></div>
+        <div class="actions">
+          <button class="btn btn-success" onclick="downloadMonthly()">⬇️ ดาวน์โหลด Result_Monthly_employee.xlsx</button>
+          <span class="actions-note">* ทุก sheet จะถูก export ครบ</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────
+const fileData  = { daily: null, monthly: null, shift: null };
+const converted = { daily: null, monthly: null }; // final AOA or map
+
+// ─── File upload helpers ──────────────────────────────────────────
+function handleFile(type, input) {
+  const file = input.files[0];
+  if (!file) return;
+  setFile(type, file);
+}
+function setFile(type, file) {
+  fileData[type] = file;
+  document.getElementById('fname-' + type).textContent = '✓ ' + file.name;
+  document.getElementById('zone-' + type).classList.add('filled');
+  checkAllReady();
+}
+function onDragOver(e, type) {
+  e.preventDefault();
+  document.getElementById('zone-' + type).classList.add('drag-over');
+}
+function onDragLeave(type) {
+  document.getElementById('zone-' + type).classList.remove('drag-over');
+}
+function onDrop(e, type) {
+  e.preventDefault();
+  document.getElementById('zone-' + type).classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(type, file);
+}
+function checkAllReady() {
+  const hasShift = !!fileData.shift;
+  const hasData  = !!(fileData.daily || fileData.monthly);
+  document.getElementById('btn-convert').disabled = !(hasShift && hasData);
+}
+
+// ─── File reading ─────────────────────────────────────────────────
+function readFileBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(new Uint8Array(e.target.result));
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+function parseWb(buf, opts = {}) {
+  return XLSX.read(buf, { type: 'array', cellDates: true, ...opts });
+}
+
+// ─── Time utilities ───────────────────────────────────────────────
+// Returns minutes since midnight, or null
+// Handles: "08:05" string, Excel numeric fraction (0–1), Date objects
+function toMins(val) {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'string') {
+    val = val.trim();
+    const m = val.match(/^(\d{1,2}):(\d{2})/);
+    if (m) return +m[1] * 60 + +m[2];
+    return null;
+  }
+  if (typeof val === 'number') {
+    // Excel stores time as fraction of a day (0–1); full datetimes include an integer date part
+    const frac = val - Math.floor(val);
+    return Math.round(frac * 1440 * 100) / 100; // keep 2 decimal places
+  }
+  if (val instanceof Date) {
+    // Avoid timezone issues — reconstruct from the numeric value SheetJS stores internally
+    // getTime() gives ms since epoch; use UTC to extract h/m regardless of browser locale
+    return val.getUTCHours() * 60 + val.getUTCMinutes() + val.getUTCSeconds() / 60;
+  }
+  return null;
+}
+
+function minsToDisplay(mins) {
+  if (mins === null || mins < 0) return '';
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
+// ─── Build shift map from group-workday ────────────────────────────
+// Returns: { shiftName: [ {startMins, endMins, isWorkday}, ... ] }
+// Read with cellDates:false so times come as raw numeric fractions (0–1),
+// avoiding any browser-timezone distortion of Date objects.
+function buildShiftMap(wb) {
+  const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('unique')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  // Use raw:true + cellDates:false — times stay as Excel fractions, booleans stay as numbers
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    const [name, startVal, endVal, , isWorkday] = rows[i];
+    if (!name) continue;
+    const startMins = toMins(startVal);
+    if (startMins === null) continue;
+    const endMins = toMins(endVal);
+    // isWorkday may be boolean true/false or 1/0 or string "TRUE"/"FALSE"
+    const isWd = isWorkday === true || isWorkday === 1 ||
+                 String(isWorkday).toLowerCase() === 'true';
+    if (!map[name]) map[name] = [];
+    map[name].push({ startMins, endMins, isWd });
+  }
+  return map;
+}
+
+// Get late minutes for a given check-in time string and shift name
+// Returns minutes (number) or null
+function calcLateMins(checkInStr, shiftName, shiftMap) {
+  const checkInMins = toMins(checkInStr);
+  if (checkInMins === null) return null;
+
+  const entries = (shiftMap[shiftName] || []).filter(e => e.isWd);
+  if (entries.length === 0) {
+    // fallback: use any entry (ignoring is_workday flag)
+    const all = shiftMap[shiftName] || [];
+    if (all.length === 0) return null;
+    entries.push(...all);
+  }
+
+  // Pick best shift: find entry where checkIn >= startMins with smallest diff
+  // (the shift the person was most recently supposed to start)
+  let bestEntry = null;
+  let bestDiff = Infinity;
+
+  for (const e of entries) {
+    let diff = checkInMins - e.startMins;
+    // Handle overnight shifts: if startMins is near midnight (e.g. 00:06 = 6)
+    // and checkIn is also near midnight or early morning
+    if (diff < -60 && e.startMins > 1200) {
+      // Shift starts in evening; checkIn might be past midnight (next day)
+      diff = (checkInMins + 1440) - e.startMins;
+    }
+    if (diff >= 0 && diff < bestDiff) {
+      bestDiff = diff;
+      bestEntry = e;
+    }
+  }
+
+  if (bestEntry === null) return null; // arrived before any shift start
+  return bestDiff; // minutes late (can be 0)
+}
+
+// ─── CONVERT DAILY REPORT ─────────────────────────────────────────
+// Input cols (row 3): # BranchID Name Branch Dept Shift Status CheckIn CheckOut Workhours OT Temp
+// Output cols:        # BranchID Name Branch Dept Shift Status LateMins CheckIn CheckOut Workhours OT Temp
+function convertDaily(wb, shiftMap) {
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, cellDates: false, defval: '' });
+
+  const output = [];
+  let headerRowIdx = -1;
+  let statusColIdx = -1;
+  let shiftColIdx = -1;
+  let checkInColIdx = -1;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowStr = row.map(c => String(c).trim());
+
+    // Detect header row
+    if (rowStr.includes('Status') && rowStr.includes('Shift')) {
+      headerRowIdx = i;
+      statusColIdx  = rowStr.indexOf('Status');
+      shiftColIdx   = rowStr.indexOf('Shift');
+      // Check In comes after Status
+      checkInColIdx = rowStr.indexOf('Check In');
+      if (checkInColIdx === -1) checkInColIdx = statusColIdx + 1;
+
+      const newRow = [...row];
+      newRow.splice(statusColIdx + 1, 0, 'Late Mins');
+      output.push(newRow);
+      continue;
+    }
+
+    if (headerRowIdx === -1) {
+      // Pre-header title rows: insert empty cell to keep alignment
+      const newRow = [...row];
+      newRow.splice(Math.min(7, newRow.length), 0, '');
+      output.push(newRow);
+      continue;
+    }
+
+    // Data row
+    const newRow = [...row];
+    const status = String(row[statusColIdx] || '').trim().toUpperCase();
+    const shiftName = String(row[shiftColIdx] || '').trim();
+    const checkInRaw = String(row[checkInColIdx] || '').trim();
+
+    let lateMinsValue = '';
+    if (status === 'LATE') {
+      const mins = calcLateMins(checkInRaw, shiftName, shiftMap);
+      if (mins !== null && mins > 0) {
+        // Store as Excel time fraction (mins / 1440) to match original format
+        lateMinsValue = mins / 1440;
+      }
+    }
+
+    newRow.splice(statusColIdx + 1, 0, lateMinsValue);
+    output.push(newRow);
+  }
+
+  return output;
+}
+
+// ─── CONVERT MONTHLY REPORT ───────────────────────────────────────
+// Input header:  # Day Date Worktime Status LocationIn TimeIn LocationOut TimeOut TotalHours
+// Output header: # Day Date Worktime Status LocationIn LocationOut TimeIn TimeOut TotalHours
+// → Swap index 6 (Time In) and 7 (Location Out)
+// Parse start time from Worktime string e.g. "08:05 - 16:30" → 485 mins
+function parseWorktimeStart(worktimeStr) {
+  if (!worktimeStr || typeof worktimeStr !== 'string') return null;
+  const parts = worktimeStr.split(' - ');
+  return parts[0] ? toMins(parts[0].trim()) : null;
+}
+
+function convertMonthly(wb) {
+  const result = {};
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, cellDates: false, defval: '' });
+    const output = [];
+
+    let swapActive      = false;
+    let swapIdx6        = 6;
+    let swapIdx7        = 7;
+    let statusCol       = 4;
+    let worktimeCol     = 3;
+    let timeInAfterSwap = 7;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = [...rows[i]];
+      const rowStr = row.map(c => String(c).trim());
+
+      if (!swapActive && rowStr.includes('Location In')) {
+        // ── Header row ──────────────────────────────────────────
+        const timeInIdx = rowStr.indexOf('Time In');
+        const locOutIdx = rowStr.indexOf('Location Out');
+        statusCol   = rowStr.indexOf('Status');
+        worktimeCol = rowStr.indexOf('Worktime');
+
+        if (timeInIdx !== -1 && locOutIdx !== -1) {
+          swapIdx6 = timeInIdx;
+          swapIdx7 = locOutIdx;
+        }
+        timeInAfterSwap = swapIdx7;
+
+        swapActive = true;
+        if (row.length > Math.max(swapIdx6, swapIdx7)) {
+          [row[swapIdx6], row[swapIdx7]] = [row[swapIdx7], row[swapIdx6]];
+        }
+        row.splice(statusCol + 1, 0, 'Late Mins');
+        output.push(row);
+        continue;
+      }
+
+      if (swapActive) {
+        if (row.length > Math.max(swapIdx6, swapIdx7)) {
+          [row[swapIdx6], row[swapIdx7]] = [row[swapIdx7], row[swapIdx6]];
+        }
+        const status      = String(row[statusCol]        || '').trim().toLowerCase();
+        const worktimeStr = String(row[worktimeCol]       || '').trim();
+        const timeInStr   = String(row[timeInAfterSwap]   || '').trim();
+
+        let lateMins = '';
+        if (status === 'late' && timeInStr && timeInStr !== '-') {
+          const startMins   = parseWorktimeStart(worktimeStr); // ← start from Worktime column
+          const checkInMins = toMins(timeInStr);
+          if (startMins !== null && checkInMins !== null) {
+            const diff = checkInMins - startMins;
+            if (diff > 0) lateMins = diff / 1440;
+          }
+        }
+        row.splice(statusCol + 1, 0, lateMins);
+      } else {
+        row.splice(statusCol + 1, 0, '');
+      }
+
+      output.push(row);
+    }
+
+    result[sheetName] = output;
+  }
+  return result;
+}
+
+// ─── MAIN CONVERT ─────────────────────────────────────────────────
+async function convertAll() {
+  const btn = document.getElementById('btn-convert');
+  const statusEl = document.getElementById('convert-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⚙️</span> กำลังแปลง...';
+  statusEl.textContent = '';
+
+  try {
+    statusEl.textContent = 'กำลังอ่านไฟล์...';
+
+    // Shift file is always required
+    const shiftBuf = await readFileBuffer(fileData.shift);
+    statusEl.textContent = 'วิเคราะห์ข้อมูลกะ...';
+    // Read shift with raw numeric fractions — avoids timezone issues with Date objects
+    const shiftWb = XLSX.read(shiftBuf, { type: 'array', raw: true });
+    const shiftMap = buildShiftMap(shiftWb);
+
+    let anyResult = false;
+
+    if (fileData.daily) {
+      statusEl.textContent = 'แปลง Daily Report...';
+      const dailyBuf = await readFileBuffer(fileData.daily);
+      const dailyWb = parseWb(dailyBuf, { cellDates: false });
+      converted.daily = convertDaily(dailyWb, shiftMap);
+      renderDailyTable(converted.daily, shiftMap);
+      anyResult = true;
+    } else {
+      converted.daily = null;
+    }
+
+    if (fileData.monthly) {
+      statusEl.textContent = 'แปลง Monthly Report...';
+      const monthlyBuf = await readFileBuffer(fileData.monthly);
+      const monthlyWb = parseWb(monthlyBuf, { cellDates: false });
+      converted.monthly = convertMonthly(monthlyWb);
+      renderMonthlySetup(converted.monthly);
+      anyResult = true;
+    } else {
+      converted.monthly = null;
+    }
+
+    if (!anyResult) throw new Error('ไม่มีไฟล์ Daily หรือ Monthly ให้แปลง');
+    statusEl.textContent = 'สำเร็จ ✓';
+
+    // Show the tab that has data; prefer daily if both available
+    document.getElementById('result-section').classList.remove('hidden');
+    if (fileData.daily) switchTab('daily');
+    else switchTab('monthly');
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    statusEl.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+    console.error(err);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '⚙️ แปลงไฟล์';
+}
+
+// ─── RENDER DAILY TABLE ───────────────────────────────────────────
+function renderDailyTable(data, shiftMap) {
+  // Find header row
+  let hIdx = -1;
+  let lateMinsCol = -1;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i].map(c => String(c).trim());
+    if (row.includes('Late Mins')) {
+      hIdx = i;
+      lateMinsCol = row.indexOf('Late Mins');
+      break;
+    }
+  }
+  if (hIdx === -1) return;
+
+  const headers = data[hIdx];
+  const dataRows = data.slice(hIdx + 1).filter(r => r.some(c => c !== '' && c !== null));
+
+  // Stats
+  let lateCount = 0, presentCount = 0, absentCount = 0, lateWithMins = 0;
+  const statusCol = headers.findIndex(h => String(h).trim() === 'Status');
+  for (const row of dataRows) {
+    const st = String(row[statusCol] || '').trim().toUpperCase();
+    if (st === 'LATE') { lateCount++; if (row[lateMinsCol] !== '') lateWithMins++; }
+    else if (st === 'PRESENT') presentCount++;
+    else if (st === 'ABSENT') absentCount++;
+  }
+
+  document.getElementById('daily-summary').innerHTML = `
+    <div class="summary-item">📋 รวม: <span class="badge badge-blue">${dataRows.length} คน</span></div>
+    <div class="summary-item">✅ PRESENT: <span class="badge badge-green">${presentCount}</span></div>
+    <div class="summary-item">⏰ LATE: <span class="badge badge-red">${lateCount}</span></div>
+    <div class="summary-item">🟡 มี Late Mins: <span class="badge badge-orange">${lateWithMins}</span></div>
+    <div class="summary-item">❌ ABSENT: <span class="badge badge-gray">${absentCount}</span></div>
+  `;
+
+  // Check for shifts not found in shiftMap
+  const notFound = new Set();
+  for (const row of dataRows) {
+    const st = String(row[statusCol] || '').trim().toUpperCase();
+    if (st === 'LATE') {
+      const shiftCol = headers.findIndex(h => String(h).trim() === 'Shift');
+      const sn = String(row[shiftCol] || '').trim();
+      if (sn && !shiftMap[sn] && row[lateMinsCol] === '') notFound.add(sn);
+    }
+  }
+  const warnEl = document.getElementById('daily-warn');
+  if (notFound.size > 0) {
+    warnEl.className = 'msg msg-warn';
+    warnEl.innerHTML = '⚠️ ไม่พบข้อมูลกะสำหรับ: ' + [...notFound].join(', ') + ' — Late Mins จะว่างเปล่า';
+    warnEl.classList.remove('hidden');
+  } else {
+    warnEl.classList.add('hidden');
+  }
+
+  // Build table
+  let html = '<thead><tr>';
+  for (let c = 0; c < headers.length; c++) {
+    const h = String(headers[c] || '');
+    html += `<th${h === 'Late Mins' ? ' class="highlight-col"' : ''}>${h}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const row of dataRows) {
+    const st = String(row[statusCol] || '').trim().toUpperCase();
+    const stClass = st === 'LATE' ? 'cell-late' : st === 'PRESENT' ? 'cell-present' : st === 'ABSENT' ? 'cell-absent' : '';
+    html += '<tr>';
+    for (let c = 0; c < headers.length; c++) {
+      let val = row[c] !== undefined ? row[c] : '';
+      let cls = '';
+      if (c === statusCol) { cls = stClass; val = String(val); }
+      else if (c === lateMinsCol) {
+        if (val !== '' && val !== 0) {
+          const mins = val * 1440;
+          val = minsToDisplay(mins);
+          cls = 'cell-late-mins';
+        } else { val = ''; }
+      }
+      html += `<td class="${cls}">${val}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  document.getElementById('daily-table').innerHTML = html;
+}
+
+// ─── RENDER MONTHLY ───────────────────────────────────────────────
+function renderMonthlySetup(data) {
+  const sheetNames = Object.keys(data);
+  const sel = document.getElementById('sheet-select');
+  sel.innerHTML = '';
+  for (const s of sheetNames) {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  }
+
+  const infoEl = document.getElementById('monthly-info');
+  infoEl.textContent = `📋 มีทั้งหมด ${sheetNames.length} sheet (พนักงาน) — download จะ export ครบทุก sheet`;
+  infoEl.classList.remove('hidden');
+
+  renderMonthlySheet(sheetNames[0]);
+}
+
+function renderMonthlySheet(sheetName) {
+  const data = converted.monthly[sheetName];
+  if (!data) return;
+
+  let hIdx = -1;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i].some(c => String(c) === 'Location In')) { hIdx = i; break; }
+  }
+  if (hIdx === -1) return;
+
+  const headers = data[hIdx];
+  const dataRows = data.slice(hIdx + 1).filter(r => r.some(c => c !== '' && c !== null));
+
+  let html = '<thead><tr>';
+  const locOutIdx = headers.findIndex(h => String(h) === 'Location Out');
+  const timeInIdx = headers.findIndex(h => String(h) === 'Time In');
+  for (let c = 0; c < headers.length; c++) {
+    const h = String(headers[c] || '');
+    html += `<th>${h}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  const statusColIdx   = headers.findIndex(h => String(h) === 'Status');
+  const lateMinsColIdx = headers.findIndex(h => String(h) === 'Late Mins');
+
+  for (const row of dataRows) {
+    const st = String(row[statusColIdx] || '').trim().toLowerCase();
+    const stClass = st === 'late' ? 'cell-late' : st === 'present' ? 'cell-present' : st === 'absent' ? 'cell-absent' : '';
+    html += '<tr>';
+    for (let c = 0; c < headers.length; c++) {
+      let val = row[c] !== undefined ? row[c] : '';
+      let cls = '';
+      if (c === statusColIdx) {
+        cls = stClass;
+        if (val !== '') val = String(val).toUpperCase();
+      } else if (c === lateMinsColIdx && val !== '' && val !== 0) {
+        const mins = val * 1440;
+        val = minsToDisplay(mins);
+        cls = 'cell-late-mins';
+      }
+      html += `<td class="${cls}">${val}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  document.getElementById('monthly-table').innerHTML = html;
+}
+
+// ─── TAB SWITCH ───────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['daily','monthly'][i] === tab);
+  });
+  document.querySelectorAll('.tab-pane').forEach((p, i) => {
+    p.classList.toggle('active', ['daily','monthly'][i] === tab);
+  });
+}
+
+// ─── DOWNLOAD ─────────────────────────────────────────────────────
+async function downloadDaily() {
+  if (!converted.daily) { alert('ไม่มีข้อมูล Daily Report'); return; }
+
+  // ── Find header row index ──────────────────────────────────────
+  let headerIdx = -1;
+  for (let i = 0; i < converted.daily.length; i++) {
+    if (converted.daily[i].some(c => String(c) === 'Late Mins')) { headerIdx = i; break; }
+  }
+  const headers    = headerIdx >= 0 ? converted.daily[headerIdx] : [];
+  const lateMinsC  = headers.findIndex(c => String(c) === 'Late Mins');   // 0-based
+  const statusC    = headers.findIndex(c => String(c).trim() === 'Status');
+
+  // ── Palette (ARGB) ─────────────────────────────────────────────
+  const C = {
+    headerBg   : 'FF1A5276', headerFg: 'FFFFFFFF',
+    lateMinsHdr: 'FFC0392B',
+    late        : 'FFC0392B', lateBg  : 'FFFDF0EF',
+    present     : 'FF1E8449',
+    absent      : 'FF7F8C8D',
+    rowAlt      : 'FFF8FAFC',
+    border      : 'FFDDDDDD',
+  };
+
+  const thin = { style: 'thin', color: { argb: C.border } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+
+  // ── Create workbook ────────────────────────────────────────────
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet 1');
+
+  // Column widths (1-based index)
+  const widths = [4, 9, 28, 20, 38, 16, 10, 10, 9, 10, 12, 10, 14];
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  // ── Add rows with styling ──────────────────────────────────────
+  converted.daily.forEach((rowData, ri) => {
+    // Convert Late Mins fraction → keep as number for numFmt
+    const values = rowData.map((v, ci) => {
+      if (ri > headerIdx && ci === lateMinsC && v !== '' && v !== 0) return v; // fraction
+      return v;
+    });
+
+    const exRow = ws.addRow(values);
+
+    if (ri < headerIdx) {
+      // ── Title rows (DAILY REPORT / Branch name) ────────────────
+      exRow.font = { bold: true, size: 16, name: 'TH SarabunPSK' };
+      exRow.height = 24;
+
+    } else if (ri === headerIdx) {
+      // ── Column header row ──────────────────────────────────────
+      exRow.height = 32;
+      exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        const isLateMinsHdr = col - 1 === lateMinsC;
+        cell.fill   = { type: 'pattern', pattern: 'solid',
+                        fgColor: { argb: isLateMinsHdr ? C.lateMinsHdr : C.headerBg } };
+        cell.font   = { color: { argb: C.headerFg }, bold: true, size: 16, name: 'TH SarabunPSK' };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+        cell.border = border;
+      });
+
+    } else {
+      // ── Data rows ──────────────────────────────────────────────
+      const status = String(rowData[statusC] || '').trim().toUpperCase();
+      const isEven = (ri - headerIdx) % 2 === 0;
+      exRow.height = 24;
+
+      exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        const ci = col - 1;
+
+        // Alternating background
+        if (isEven) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.rowAlt } };
+        }
+        cell.font      = { size: 16, name: 'TH SarabunPSK' };
+        cell.alignment = { vertical: 'middle' };
+        cell.border    = border;
+
+        // Status column color
+        if (ci === statusC) {
+          const fg = status === 'LATE' ? C.late : status === 'PRESENT' ? C.present : C.absent;
+          cell.font = { color: { argb: fg }, bold: true, size: 16, name: 'TH SarabunPSK' };
+        }
+
+        // Late Mins column: red text + light red bg + time format
+        if (ci === lateMinsC) {
+          if (cell.value !== null && cell.value !== '' && cell.value !== 0) {
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lateBg } };
+            cell.font   = { color: { argb: C.late }, bold: true, size: 16, name: 'TH SarabunPSK' };
+            cell.numFmt = 'h:mm';
+          }
+        }
+      });
+    }
+  });
+
+  // ── Merged cells ───────────────────────────────────────────────
+  ws.mergeCells('A1:B1');
+  ws.mergeCells('A2:B2');
+  ws.mergeCells('K1:M1');
+  ws.mergeCells('K2:M2');
+
+  // ── Download ───────────────────────────────────────────────────
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'Result_daily_report.xlsx'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadMonthly() {
+  if (!converted.monthly) { alert('ไม่มีข้อมูล Monthly Report'); return; }
+
+  const C = {
+    headerBg: 'FF1A5276', headerFg: 'FFFFFFFF',
+    late    : 'FFC0392B', present: 'FF1E8449', absent: 'FF7F8C8D',
+    rowAlt  : 'FFF8FAFC', border : 'FFDDDDDD',
+    swapped : 'FFC0392B', // Location Out & Time In (swapped cols)
+  };
+  const thin   = { style: 'thin', color: { argb: C.border } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+
+  const wb = new ExcelJS.Workbook();
+
+  for (const [sheetName, rows] of Object.entries(converted.monthly)) {
+    const ws = wb.addWorksheet(sheetName.substring(0, 31));
+
+    // Find header row
+    let hIdx = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].some(c => String(c) === 'Location In')) { hIdx = i; break; }
+    }
+    const headers    = hIdx >= 0 ? rows[hIdx] : [];
+    const statusC    = headers.findIndex(h => String(h) === 'Status');
+    const lateMinsC  = headers.findIndex(h => String(h) === 'Late Mins');
+
+    // Column widths (now 11 cols with Late Mins)
+    const colWidthsM = [4, 12, 16, 18, 10, 10, 18, 18, 10, 10, 12];
+    colWidthsM.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    rows.forEach((rowData, ri) => {
+      // Uppercase Status column for data rows
+      const rowValues = rowData.map((v, ci) =>
+        ri > hIdx && ci === statusC && v !== '' ? String(v).toUpperCase() : v
+      );
+      const exRow = ws.addRow(rowValues);
+
+      if (ri < hIdx) {
+        exRow.font   = { bold: ri === 1, size: 16, name: 'TH SarabunPSK' };
+        exRow.height = 16;
+      } else if (ri === hIdx) {
+        exRow.height = 28;
+        exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+          const ci = col - 1;
+          const isLateMinsHdr = ci === lateMinsC;
+          cell.fill   = { type: 'pattern', pattern: 'solid',
+                          fgColor: { argb: isLateMinsHdr ? C.lateMinsHdr : C.headerBg } };
+          cell.font   = { color: { argb: C.headerFg }, bold: true, size: 16, name: 'TH SarabunPSK' };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = border;
+        });
+      } else {
+        const status = String(rowData[statusC] || '').trim().toUpperCase();
+        const isEven = (ri - hIdx) % 2 === 0;
+        exRow.height = 24;
+        exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+          const ci = col - 1;
+          if (isEven) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.rowAlt } };
+          cell.font      = { size: 16, name: 'TH SarabunPSK' };
+          cell.alignment = { vertical: 'middle' };
+          cell.border    = border;
+          if (ci === statusC) {
+            const fg = status === 'LATE' ? C.late : status === 'PRESENT' ? C.present : C.absent;
+            cell.font = { color: { argb: fg }, bold: true, size: 16, name: 'TH SarabunPSK' };
+          }
+          // Late Mins: red text + light red bg + h:mm format
+          if (ci === lateMinsC && cell.value !== null && cell.value !== '' && cell.value !== 0) {
+            cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lateBg } };
+            cell.font   = { color: { argb: C.late }, bold: true, size: 16, name: 'TH SarabunPSK' };
+            cell.numFmt = 'h:mm';
+          }
+        });
+      }
+    });
+
+    // Apply merged cells for title rows (using original rows data)
+    applyMonthlyMerges(ws, rows);
+  }
+
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'Result_Monthly_employee.xlsx'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Apply Monthly merges for one worksheet ────────────────────────
+// rows = original AOA (before addRow), ws = ExcelJS worksheet already populated
+function applyMonthlyMerges(ws, rows) {
+  let r1 = -1, r2 = -1, r3 = -1, r4 = -1, rRemark = -1;
+  let exportDateCol = -1, monthlyReportCol = -1, totalCols = 10;
+
+  rows.forEach((row, ri) => {
+    const a = String(row[0] || '');
+    if (a.includes('EMPLOYEE MONTHLY LOG REPORT')) {
+      r1 = ri + 1;
+      totalCols = row.length; // detect actual column count (10 or 11 with Late Mins)
+      // Find "Export Date" column dynamically
+      const idx = row.findIndex(v => String(v).includes('Export Date'));
+      if (idx >= 0) exportDateCol = idx + 1; // ExcelJS 1-indexed
+    }
+    if (a === 'Employee Id') r3 = ri + 1;
+    if (a === 'Full Name')   r4 = ri + 1;
+    if (a.toLowerCase().includes('remark')) rRemark = ri + 1;
+    // Find Monthly Report row dynamically
+    const mIdx = row.findIndex(v => String(v).includes('Monthly Report'));
+    if (mIdx >= 0) { r2 = ri + 1; monthlyReportCol = mIdx + 1; }
+  });
+
+  // ── Row 1: EMPLOYEE MONTHLY LOG REPORT ─────────────────────────
+  if (r1 > 0) {
+    ws.mergeCells(r1, 1, r1, 3); // A:C
+    if (exportDateCol > 0) {
+      const iVal = String(ws.getCell(r1, exportDateCol + 1).value || '').trim();
+      ws.mergeCells(r1, exportDateCol, r1, totalCols);
+      const hVal = String(ws.getCell(r1, exportDateCol).value || '').trim();
+      ws.getCell(r1, exportDateCol).value = hVal + (iVal ? ' ' + iVal : '');
+      ws.getCell(r1, exportDateCol).font  = { bold: true, size: 16, name: 'TH SarabunPSK' };
+      ws.getCell(r1, exportDateCol).alignment = { vertical: 'middle' };
+    }
+  }
+
+  // ── Row 2: Monthly Report : May 2026 ───────────────────────────
+  if (r2 > 0 && monthlyReportCol > 0) {
+    const iVal = String(ws.getCell(r2, monthlyReportCol + 1).value || '').trim();
+    ws.mergeCells(r2, monthlyReportCol, r2, totalCols);
+    const hVal = String(ws.getCell(r2, monthlyReportCol).value || '').trim();
+    ws.getCell(r2, monthlyReportCol).value = hVal + (iVal ? ' ' + iVal : '');
+    ws.getCell(r2, monthlyReportCol).font  = { bold: true, size: 16, name: 'TH SarabunPSK' };
+    ws.getCell(r2, monthlyReportCol).alignment = { vertical: 'middle' };
+  }
+
+  // ── Row 3: Employee Id ─────────────────────────────────────────
+  if (r3 > 0) {
+    const bVal = String(ws.getCell(r3, 2).value || '').trim();
+    ws.mergeCells(r3, 1, r3, 3); // A:C
+    ws.mergeCells(r3, 5, r3, 6); // E:F (งานห้องคลอด)
+    const aVal = String(ws.getCell(r3, 1).value || '').trim();
+    ws.getCell(r3, 1).value = aVal + (bVal ? ' ' + bVal : '');
+    ws.getCell(r3, 1).font  = { size: 16, name: 'TH SarabunPSK' };
+    ws.getCell(r3, 1).alignment = { vertical: 'middle' };
+  }
+
+  // ── Row 4: Full Name ───────────────────────────────────────────
+  if (r4 > 0) {
+    const bVal = String(ws.getCell(r4, 2).value || '').trim();
+    ws.mergeCells(r4, 1, r4, 3); // A:C
+    ws.mergeCells(r4, 5, r4, 6); // E:F
+    const aVal = String(ws.getCell(r4, 1).value || '').trim();
+    ws.getCell(r4, 1).value = aVal + (bVal ? ' ' + bVal : '');
+    ws.getCell(r4, 1).font  = { size: 16, name: 'TH SarabunPSK' };
+    ws.getCell(r4, 1).alignment = { vertical: 'middle' };
+  }
+
+  // ── Remark row: A to last col ──────────────────────────────────
+  if (rRemark > 0) {
+    ws.mergeCells(rRemark, 1, rRemark, totalCols);
+    ws.getCell(rRemark, 1).font      = { italic: true, size: 14, name: 'TH SarabunPSK' };
+    ws.getCell(rRemark, 1).alignment = { vertical: 'middle', wrapText: true };
+  }
+}
+</script>
+</body>
+</html>
